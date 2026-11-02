@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>幾 A 幾 B｜版本一</title>
+<style>
+  :root {
+    --bg: #f3f5f2;
+    --surface: #ffffff;
+    --ink: #1c2420;
+    --muted: #5b6761;
+    --line: #cfd8d2;
+    --accent: #1f6f5b;
+    --accent-ink: #ffffff;
+    --a-color: #1f6f5b;
+    --b-color: #b0661b;
+    --err: #b3261e;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141a17;
+      --surface: #1d2622;
+      --ink: #e8efea;
+      --muted: #9aa9a1;
+      --line: #33423b;
+      --accent: #5cc4a6;
+      --accent-ink: #0d1612;
+      --a-color: #5cc4a6;
+      --b-color: #e3a15a;
+      --err: #ff8a80;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  main { max-width: 520px; margin: 0 auto; padding: 28px 18px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: .02em; }
+  .rule { color: var(--muted); margin: 0 0 22px; font-size: .95rem; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 10px; }
+  input[type="text"] {
+    flex: 1; min-width: 0;
+    font: inherit; font-size: 1.8rem; letter-spacing: .5em; text-align: center;
+    padding: 8px 10px; border: 2px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink);
+  }
+  input[type="text"]:focus-visible, button:focus-visible, .switch input:focus-visible + .track {
+    outline: 3px solid var(--accent); outline-offset: 2px;
+  }
+  input[type="text"]:disabled { opacity: .5; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer;
+    padding: 10px 18px; border-radius: 8px; border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-ink);
+  }
+  button.ghost { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  #msg { min-height: 1.6em; margin: 10px 0 0; color: var(--err); font-size: .95rem; }
+
+  .result { text-align: center; padding: 22px 18px; }
+  .result .guess { font-size: 1.1rem; color: var(--muted); letter-spacing: .4em; }
+  .result .score { font-size: 3rem; font-weight: 700; line-height: 1.2; }
+  .result .score .a { color: var(--a-color); }
+  .result .score .b { color: var(--b-color); }
+  .result .note { color: var(--muted); font-size: .95rem; margin-top: 4px; }
+  .result.win .score { color: var(--a-color); }
+
+  .meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .count { color: var(--muted); }
+  .count b { color: var(--ink); font-size: 1.1rem; }
+
+  .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .track { width: 42px; height: 24px; border-radius: 12px; background: var(--line); position: relative; transition: background .15s; }
+  .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); transition: transform .15s; }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::after { transform: translateX(18px); }
+  @media (prefers-reduced-motion: reduce) { .track, .track::after { transition: none; } }
+
+  #answerBox { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--bg); border: 1px dashed var(--line); }
+  #answerBox strong { font-size: 1.4rem; letter-spacing: .4em; margin-left: 6px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>幾 A 幾 B</h1>
+  <p class="rule">答案是四個不重複的數字（0～9，可以 0 開頭）。A＝數字和位置都對，B＝數字對但位置不同。</p>
+
+  <section class="panel">
+    <div class="row">
+      <input id="guessInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off"
+             placeholder="0123" aria-label="輸入四位數字">
+      <button id="submitBtn" type="button">送出</button>
+    </div>
+    <p id="msg" role="alert"></p>
+  </section>
+
+  <section id="result" class="panel result" aria-live="polite">
+    <div class="note">還沒有猜測，輸入四位數字開始。</div>
+  </section>
+
+  <section class="panel">
+    <div class="meta">
+      <span class="count">本局有效猜測：<b id="count">0</b> 次</span>
+      <button id="restartBtn" type="button" class="ghost">重新開始</button>
+    </div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <label class="switch">
+      <input id="debugToggle" type="checkbox">
+      <span class="track"></span>
+      <span>除錯模式（顯示本局答案）</span>
+    </label>
+    <div id="answerBox" hidden>目前答案：<strong id="answerText"></strong></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  // ---------- 遊戲規則（純函式） ----------
+  function newAnswer() {
+    var digits = "0123456789".split("");
+    for (var i = digits.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = digits[i]; digits[i] = digits[j]; digits[j] = t;
+    }
+    return digits.slice(0, 4).join("");   // 字串，保留開頭的 0
+  }
+
+  function validate(raw) {
+    var s = String(raw).trim();
+    if (s === "") return { ok: false, msg: "請先輸入四位數字。" };
+    if (!/^[0-9]+$/.test(s)) return { ok: false, msg: "只能輸入數字 0～9。" };
+    if (s.length !== 4) return { ok: false, msg: "需要剛好四位數字（目前 " + s.length + " 位）。" };
+    if (new Set(s.split("")).size !== 4) return { ok: false, msg: "四個數字不能重複。" };
+    return { ok: true, value: s };
+  }
+
+  function evaluate(answer, guess) {
+    var a = 0, b = 0;
+    for (var i = 0; i < 4; i++) {
+      if (guess[i] === answer[i]) a++;
+      else if (answer.indexOf(guess[i]) !== -1) b++;
+    }
+    return { a: a, b: b };
+  }
+
+  // ---------- 狀態 ----------
+  var state = { answer: newAnswer(), count: 0, finished: false };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var input = $("guessInput"), submitBtn = $("submitBtn"), msg = $("msg");
+  var resultEl = $("result"), countEl = $("count");
+  var debugToggle = $("debugToggle"), answerBox = $("answerBox"), answerText = $("answerText");
+
+  function renderDebug() {
+    // 只控制顯示，不動答案、次數或結果
+    var show = debugToggle.checked;
+    answerBox.hidden = !show;
+    answerText.textContent = show ? state.answer : "";
+  }
+
+  function setLocked(locked) {
+    input.disabled = locked;
+    submitBtn.disabled = locked;
+  }
+
+  function submit() {
+    if (state.finished) return;
+    var v = validate(input.value);
+    if (!v.ok) { msg.textContent = v.msg; input.focus(); return; }
+    msg.textContent = "";
+
+    var r = evaluate(state.answer, v.value);
+    state.count++;
+    countEl.textContent = state.count;
+
+    var win = r.a === 4;
+    resultEl.className = "panel result" + (win ? " win" : "");
+    resultEl.innerHTML =
+      '<div class="guess"></div>' +
+      '<div class="score"><span class="a">' + r.a + 'A</span><span class="b">' + r.b + 'B</span></div>' +
+      '<div class="note"></div>';
+    resultEl.querySelector(".guess").textContent = v.value;
+    resultEl.querySelector(".note").textContent = win
+      ? "答對了！共猜 " + state.count + " 次，本局結束。按「重新開始」再玩一局。"
+      : "第 " + state.count + " 次猜測";
+
+    input.value = "";
+    if (win) {
+      state.finished = true;
+      setLocked(true);
+      debugToggle.checked = true;   // 完成後顯示解答
+      renderDebug();
+    } else {
+      input.focus();
+    }
+  }
+
+  function restart() {
+    state = { answer: newAnswer(), count: 0, finished: false };
+    countEl.textContent = "0";
+    msg.textContent = "";
+    input.value = "";
+    setLocked(false);
+    resultEl.className = "panel result";
+    resultEl.innerHTML = '<div class="note">還沒有猜測，輸入四位數字開始。</div>';
+    debugToggle.checked = false;    // 新的一局預設關閉除錯
+    renderDebug();
+    input.focus();
+  }
+
+  submitBtn.addEventListener("click", submit);
+  input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+  $("restartBtn").addEventListener("click", restart);
+  debugToggle.addEventListener("change", renderDebug);
+
+  renderDebug();
+  input.focus();
+})();
+</script>
+</body>
+</html>
